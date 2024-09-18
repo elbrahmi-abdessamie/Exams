@@ -151,18 +151,3 @@ char *get_next_line(int fd)
 	buffer = tmp;
 	return (out_ln);
 }
-
-int main()
-{
-	int fd = open("tst", O_RDONLY);
-	char *str = get_next_line(fd);
-	printf("%s", str);
-	free(str);
-	str = get_next_line(fd);
-	printf("%s", str);
-	free(str);
-	// str = get_next_line(fd);
-	// printf("%s", str);
-	// free(str);
-
-}

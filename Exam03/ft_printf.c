@@ -49,9 +49,3 @@ int ft_printf(const char *format,...)
 	va_end(ptr);
 	return printed;
 }
-#include <stdio.h>
-int main()
-{
-	int ret = ft_printf("hel%lo %s%", "morpheus");
-	printf("%d", ret);
-}
