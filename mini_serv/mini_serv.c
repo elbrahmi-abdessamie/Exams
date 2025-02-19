@@ -8,7 +8,15 @@
 # define MAX_R_BUFFER 200013
 # define MAX_CLIENTS 2048
 
-char s_buffer[MAX_S_BUFFER], r_buffer[MAX_R_BUFFER];
+typedef enum {ARRIVED, LEFT, MSG} t_log_type;
+
+typedef union {
+    char send[MAX_S_BUFFER];
+    char receive[MAX_R_BUFFER];
+} buffer_t;
+
+buffer_t buf;
+
 fd_set r_set, w_set, c_set;
 int max_fd = 0, gid = 0;
 
@@ -29,7 +37,7 @@ typedef struct s_server{
     int (*accept)(struct s_server *this);
     void (*broadcast)(int excluded_fd);
     void (*run)(struct s_server *this);
-    void (*logger)(short type, int id, char *msg);
+    void (*logger)(t_log_type type, int id, char *msg);
     void (*process_message)(struct s_server *this, int fd, int msg_len);
 } t_server;
 
@@ -81,27 +89,27 @@ void    broadcast_msg(int excluded_fd)
     for (int fd = 0; fd <= max_fd; fd++)
     {
         if (FD_ISSET(fd, &w_set) && fd != excluded_fd)
-            if (send(fd, s_buffer, strlen(s_buffer), 0) == -1)
+            if (send(fd, buf.send, strlen(buf.send), 0) == -1)
                 error(NULL);
     }
 }
 
-void    load_log(short type, int id, char *msg)
+void    load_log(t_log_type type, int id, char *msg)
 {
-    if (type == 0)
+    if (type == ARRIVED)
     {
-        sprintf(s_buffer, "server: client %d has arrived\n", id);
+        sprintf(buf.send, "server: client %d has arrived\n", id);
         printf("[INFO] client with id: %d has been connected\n", id);
     }
-    else if (type == 1)
+    else if (type == LEFT)
     {
-        sprintf(s_buffer, "server: client %d has left\n", id);
+        sprintf(buf.send, "server: client %d has left\n", id);
         printf("[INFO] client with id: %d has been disconnected\n", id);
         bzero(msg, strlen(msg));
     }
     else
     {
-        sprintf(s_buffer, "client %d: %s\n", id, msg);
+        sprintf(buf.send, "client %d: %s\n", id, msg);
         printf("[INFO] message: %s sent by client woth id: %d\n", msg, id);
         bzero(msg, strlen(msg));
 
@@ -110,10 +118,10 @@ void    load_log(short type, int id, char *msg)
 
 void process_message(t_server *this, int fd, int msg_len) {
     for (int i = 0, j = strlen(clients[fd].msg); i < msg_len; i++, j++) {
-        clients[fd].msg[j] = r_buffer[i];
+        clients[fd].msg[j] = buf.receive[i];
         if (clients[fd].msg[j] == '\n') {
             clients[fd].msg[j] = 0;
-            this->logger(2, clients[fd].id, clients[fd].msg);
+            this->logger(MSG, clients[fd].id, clients[fd].msg);
             this->broadcast(fd);
             j = -1;
         }
@@ -139,15 +147,15 @@ void    server_run(t_server *this)
                     if (c_sock > max_fd) max_fd = c_sock;
                     FD_SET(c_sock, &c_set);
                     clients[c_sock].id = gid++;
-                    this->logger(0, clients[c_sock].id, NULL);
+                    this->logger(ARRIVED, clients[c_sock].id, NULL);
                     this->broadcast(c_sock);
                 }
                 else
                 {
-                    int msg_len = recv(fd, r_buffer, sizeof(r_buffer), 0);
+                    int msg_len = recv(fd, buf.receive, sizeof(buf.receive), 0);
                     if (msg_len <= 0)
                     {
-                        this->logger(1, clients[fd].id, clients[fd].msg);
+                        this->logger(LEFT, clients[fd].id, clients[fd].msg);
                         this->broadcast(fd);
                         FD_CLR(fd, &c_set);
                         close(fd);
